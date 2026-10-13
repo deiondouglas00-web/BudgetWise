@@ -1,5 +1,6 @@
 
-"""BudgetWise v0.9 — Personal Finance Dashboard."""
+
+"""BudgetWise v1.0 — Personal Finance Dashboard."""
 
 from datetime import date, datetime
 from html import escape
@@ -9,6 +10,7 @@ import plotly.express as px
 import streamlit as st
 
 from database import (
+    DEMO_MODE,
     create_database,
     load_transactions,
     load_setting,
@@ -17,12 +19,18 @@ from database import (
     update_transaction,
     delete_transaction,
 )
+
 from finance import (
     budget_summary,
     monthly_series,
     nonnegative_money,
     positive_money,
 )
+
+
+# ==========================================
+# CONFIGURATION
+# ==========================================
 
 BG = "#0F1117"
 CARD = "#1C2028"
@@ -35,50 +43,72 @@ MUTED = "#9CA3AF"
 
 PALETTE = [
     ORANGE, GREEN, YELLOW, "#3B82F6",
-    "#A78BFA", "#EC4899", "#14B8A6", "#64748B",
+    "#A78BFA", "#EC4899", "#14B8A6",
 ]
 
 CATEGORIES = [
-    "Housing", "Groceries", "Food", "Transportation",
-    "Utilities", "Entertainment", "Healthcare",
-    "Shopping", "Education", "Other",
+    "Housing",
+    "Groceries",
+    "Food",
+    "Transportation",
+    "Utilities",
+    "Entertainment",
+    "Healthcare",
+    "Shopping",
+    "Education",
+    "Other",
 ]
 
 st.set_page_config(
-    page_title="BudgetWise | Personal Finance",
+    page_title=(
+        "BudgetWise Demo"
+        if DEMO_MODE
+        else "BudgetWise | Personal Finance"
+    ),
     page_icon="💚",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
+
+# ==========================================
+# CUSTOM STYLING
+# ==========================================
+
 st.markdown("""
 <style>
-:root { color-scheme: dark; }
-.stApp { background: #0F1117; color: #F9FAFB; }
+:root {
+    color-scheme: dark;
+}
+
+.stApp {
+    background: #0F1117;
+    color: #F9FAFB;
+}
+
 [data-testid="stSidebar"] {
     background: #151A21;
     border-right: 1px solid #303741;
 }
+
 .block-container {
     max-width: 1500px;
     padding-top: 2rem;
     padding-bottom: 3rem;
 }
+
 h1, h2, h3 {
-    letter-spacing: -.5px;
     color: #F9FAFB !important;
+    letter-spacing: -0.5px;
 }
-.bw-subtitle {
-    color: #9CA3AF;
-    margin-top: -.6rem;
-    margin-bottom: 1.5rem;
-}
+
 .bw-brand {
     display: flex;
     align-items: center;
     gap: 12px;
     padding: 16px 3px;
 }
+
 .bw-brand-icon {
     width: 48px;
     height: 48px;
@@ -89,31 +119,19 @@ h1, h2, h3 {
     place-items: center;
     font-size: 1.7rem;
 }
+
 .bw-brand-name {
     font-size: 1.4rem;
     font-weight: 800;
     color: #F9FAFB;
 }
+
 .bw-brand-subtitle {
     font-size: .65rem;
     color: #9CA3AF;
     letter-spacing: .17em;
 }
-[data-testid="stSidebar"] [role="radiogroup"] {
-    gap: 8px;
-}
-[data-testid="stSidebar"] [role="radiogroup"] label {
-    border-radius: 12px;
-    padding: 11px 13px;
-    transition: background .2s ease;
-}
-[data-testid="stSidebar"] [role="radiogroup"] label:hover {
-    background: #242D35;
-}
-[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {
-    background: #12382E;
-    border-left: 3px solid #10B981;
-}
+
 .bw-card {
     background: #1C2028;
     border: 1px solid #303741;
@@ -123,39 +141,32 @@ h1, h2, h3 {
     position: relative;
     overflow: hidden;
     box-shadow: 0 4px 18px rgba(0,0,0,.12);
-    transition: transform .22s ease, box-shadow .22s ease;
+    transition: transform .22s ease;
 }
+
 .bw-card:hover {
     transform: translateY(-4px);
-    box-shadow: 0 14px 30px rgba(0,0,0,.3);
 }
-.bw-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 10px;
-}
+
 .bw-card-label {
     font-size: .92rem;
     font-weight: 600;
     color: #C5CAD2;
 }
-.bw-card-icon {
-    color: var(--accent);
-    font-size: 1.5rem;
-}
+
 .bw-card-value {
     color: #F9FAFB;
     font-size: clamp(1.3rem,2.2vw,2rem);
     font-weight: 800;
-    font-variant-numeric: tabular-nums;
     margin-top: 12px;
 }
+
 .bw-card-note {
     color: #9CA3AF;
     font-size: .77rem;
     margin-top: 7px;
 }
+
 .bw-card-line {
     position: absolute;
     bottom: 0;
@@ -164,61 +175,71 @@ h1, h2, h3 {
     height: 4px;
     background: var(--accent);
 }
+
 .bw-progress-track {
     background: #303741;
     height: 14px;
     border-radius: 20px;
     overflow: hidden;
 }
+
 .bw-progress-fill {
     height: 100%;
-    background: linear-gradient(90deg,#FACC15,#F97316);
+    background: linear-gradient(
+        90deg, #FACC15, #F97316
+    );
     border-radius: 20px;
-    transition: width .7s ease;
 }
-[data-testid="stDataFrame"] {
-    border-radius: 14px;
-    overflow: hidden;
-    border: 1px solid #303741;
-}
+
 [data-testid="stForm"] {
     background: #1C2028;
     border: 1px solid #303741;
     border-radius: 16px;
     padding: 15px;
 }
+
 @media(max-width:768px) {
     .block-container {
         padding-left: 1rem;
         padding-right: 1rem;
     }
+
     .bw-card {
         min-height: 135px;
         padding: 16px;
     }
 }
+
 @media(prefers-reduced-motion:reduce) {
-    .bw-card, .bw-progress-fill {
+    .bw-card {
         transition: none;
     }
-    .bw-card:hover { transform: none; }
 }
 </style>
 """, unsafe_allow_html=True)
 
 
+# ==========================================
+# HELPERS
+# ==========================================
+
 def html(markup):
-    """Prevent Streamlit from displaying HTML as code."""
     compact = "".join(
-        line.strip() for line in markup.splitlines()
+        line.strip()
+        for line in markup.splitlines()
     )
-    st.markdown(compact, unsafe_allow_html=True)
+    st.markdown(
+        compact,
+        unsafe_allow_html=True
+    )
 
 
 def cash(value):
     amount = float(value)
+
     if amount < 0:
         return f"-${abs(amount):,.2f}"
+
     return f"${amount:,.2f}"
 
 
@@ -228,13 +249,16 @@ def card(label, amount, accent, icon, note):
 
     html(f"""
     <div class="bw-card" style="--accent:{accent}">
-      <div class="bw-card-header">
-        <span class="bw-card-label">{escape(label)}</span>
-        <span class="bw-card-icon">{escape(icon)}</span>
-      </div>
-      <div class="bw-card-value">{escape(cash(amount))}</div>
-      <div class="bw-card-note">{escape(note)}</div>
-      <div class="bw-card-line"></div>
+        <div class="bw-card-label">
+            {escape(icon)} {escape(label)}
+        </div>
+        <div class="bw-card-value">
+            {escape(cash(amount))}
+        </div>
+        <div class="bw-card-note">
+            {escape(note)}
+        </div>
+        <div class="bw-card-line"></div>
     </div>
     """)
 
@@ -244,7 +268,6 @@ def chart_theme(fig, height=365):
         paper_bgcolor=CARD,
         plot_bgcolor=CARD,
         font_color=TEXT,
-        font=dict(family="Arial, sans-serif"),
         height=height,
         margin=dict(l=20, r=20, t=60, b=30),
         legend=dict(
@@ -254,21 +277,27 @@ def chart_theme(fig, height=365):
             xanchor="center",
         ),
     )
+
     fig.update_xaxes(
         showgrid=False,
         linecolor=BORDER,
     )
+
     fig.update_yaxes(
         gridcolor=BORDER,
         zerolinecolor=BORDER,
     )
+
     return fig
 
 
 def transaction_frame(records):
     columns = [
-        "id", "transaction_date", "category",
-        "description", "amount",
+        "id",
+        "transaction_date",
+        "category",
+        "description",
+        "amount",
     ]
 
     df = pd.DataFrame(records)
@@ -284,27 +313,31 @@ def transaction_frame(records):
         errors="coerce",
     )
 
-    df["month"] = df["transaction_date"].dt.strftime(
-        "%Y-%m"
+    df["month"] = (
+        df["transaction_date"]
+        .dt.strftime("%Y-%m")
     )
 
     df["amount"] = pd.to_numeric(
-        df["amount"], errors="coerce"
+        df["amount"],
+        errors="coerce",
     ).fillna(0)
 
     return df
 
 
 def transaction_table(df, include_id=False):
-    cols = [
-        "transaction_date", "category",
-        "description", "amount",
+    columns = [
+        "transaction_date",
+        "category",
+        "description",
+        "amount",
     ]
 
     if include_id:
-        cols.insert(0, "id")
+        columns.insert(0, "id")
 
-    display = df[cols].copy()
+    display = df[columns].copy()
 
     display["transaction_date"] = (
         display["transaction_date"]
@@ -321,7 +354,8 @@ def transaction_table(df, include_id=False):
             "category": "Category",
             "description": "Description",
             "amount": st.column_config.NumberColumn(
-                "Amount", format="$%.2f"
+                "Amount",
+                format="$%.2f",
             ),
             "id": "ID",
         },
@@ -332,17 +366,27 @@ def date_months(df):
     current = date.today().strftime("%Y-%m")
 
     return sorted(
-        set(df["month"].dropna().tolist()) | {current},
+        set(df["month"].dropna().tolist())
+        | {current},
         reverse=True,
     )
 
 
 def save_expense(category, description, amount, when):
+    if DEMO_MODE:
+        raise PermissionError(
+            "Changes are disabled in demo mode."
+        )
+
     if not description.strip():
-        raise ValueError("Description is required.")
+        raise ValueError(
+            "Description is required."
+        )
 
     if not category.strip():
-        raise ValueError("Category is required.")
+        raise ValueError(
+            "Category is required."
+        )
 
     if len(description.strip()) > 200:
         raise ValueError(
@@ -359,12 +403,13 @@ def save_expense(category, description, amount, when):
     )
 
 
-# ----------------------------------------
-# DATABASE CONNECTION
-# ----------------------------------------
+# ==========================================
+# LOAD FINANCIAL DATA
+# ==========================================
 
 try:
     create_database()
+
     transactions = load_transactions()
 
     monthly_income = nonnegative_money(
@@ -377,73 +422,107 @@ try:
 
 except Exception as exc:
     st.error(
-        "BudgetWise could not open your existing database. "
-        "Your data has not been modified."
+        "BudgetWise could not load its data."
     )
     st.exception(exc)
     st.stop()
+
 
 frame = transaction_frame(transactions)
 months = date_months(frame)
 
 
-# ----------------------------------------
+# ==========================================
+# DEMO NOTICE
+# ==========================================
+
+if DEMO_MODE:
+    st.info(
+        "PUBLIC DEMO — All financial information "
+        "shown is fictional. This portfolio "
+        "demonstration is read-only. No financial "
+        "information is collected or saved."
+    )
+
+
+# ==========================================
 # SIDEBAR
-# ----------------------------------------
+# ==========================================
 
 with st.sidebar:
+
     html("""
     <div class="bw-brand">
-      <div class="bw-brand-icon">◈</div>
-      <div>
-        <div class="bw-brand-name">BudgetWise</div>
-        <div class="bw-brand-subtitle">PERSONAL FINANCE</div>
-      </div>
+        <div class="bw-brand-icon">◈</div>
+        <div>
+            <div class="bw-brand-name">
+                BudgetWise
+            </div>
+            <div class="bw-brand-subtitle">
+                PERSONAL FINANCE
+            </div>
+        </div>
     </div>
     """)
 
     st.divider()
 
-    page = st.radio(
-        "Navigation",
-        [
+    if DEMO_MODE:
+        pages = [
+            "Dashboard",
+            "Monthly Analytics",
+            "Manage Transactions",
+        ]
+    else:
+        pages = [
             "Dashboard",
             "Monthly Analytics",
             "Add Expense",
             "Manage Transactions",
             "Settings",
-        ],
+        ]
+
+    page = st.radio(
+        "Navigation",
+        pages,
         label_visibility="collapsed",
     )
 
     st.divider()
-    st.caption("BUDGETWISE v0.9")
-    st.caption("Your money. Your goals. Your future.")
+
+    if DEMO_MODE:
+        st.caption("BUDGETWISE v1.0 · PUBLIC DEMO")
+    else:
+        st.caption("BUDGETWISE v1.0")
+
+    st.caption(
+        "Your money. Your goals. Your future."
+    )
 
 
-# ----------------------------------------
+# ==========================================
 # DASHBOARD
-# ----------------------------------------
+# ==========================================
 
 if page == "Dashboard":
 
     st.caption("DASHBOARD")
     st.title("Financial Overview")
 
-    st.markdown(
-        '<div class="bw-subtitle">'
-        "Track your income, expenses, and savings "
-        "capacity in one place."
-        "</div>",
-        unsafe_allow_html=True,
+    st.caption(
+        "Track your income, expenses, and "
+        "savings capacity in one place."
     )
 
     selected = st.selectbox(
         "Reporting Month",
         months,
-        format_func=lambda m: datetime.strptime(
-            m, "%Y-%m"
-        ).strftime("%B %Y"),
+        format_func=lambda month: (
+            datetime.strptime(
+                month,
+                "%Y-%m",
+            ).strftime("%B %Y")
+        ),
     )
 
     summary = budget_summary(
@@ -483,7 +562,7 @@ if page == "Dashboard":
             summary["balance"],
             GREEN if summary["balance"] >= 0 else ORANGE,
             "◉",
-            "Income minus selected-month expenses",
+            "Income minus monthly expenses",
         )
 
     with d:
@@ -499,8 +578,8 @@ if page == "Dashboard":
 
     if summary["spending_pct"] is None:
         st.info(
-            "Set monthly income in Settings to calculate "
-            "your spending percentage."
+            "Set monthly income in Settings "
+            "to calculate spending percentage."
         )
 
     elif summary["balance"] < 0:
@@ -519,20 +598,21 @@ if page == "Dashboard":
     st.subheader("🎯 Savings Goal Coverage")
 
     if summary["goal"] > 0:
+
         pct = min(
-            max(float(summary["goal_coverage_pct"]), 0),
+            max(
+                float(summary["goal_coverage_pct"]),
+                0,
+            ),
             100,
         )
 
         html(f"""
-        <div class="bw-progress-track"
-             role="progressbar"
-             aria-label="Savings goal coverage"
-             aria-valuemin="0"
-             aria-valuemax="100"
-             aria-valuenow="{pct:.1f}">
-          <div class="bw-progress-fill"
-               style="width:{pct:.1f}%"></div>
+        <div class="bw-progress-track">
+            <div
+                class="bw-progress-fill"
+                style="width:{pct:.1f}%">
+            </div>
         </div>
         """)
 
@@ -551,15 +631,15 @@ if page == "Dashboard":
             )
         else:
             st.success(
-                "Your available budget can cover your goal, "
-                "leaving "
+                "Your available budget can cover "
+                "your goal, leaving "
                 f"{cash(summary['after_goal'])} afterward."
             )
 
     else:
         st.info(
             "Set a savings goal in Settings "
-            "to see your goal coverage."
+            "to see goal coverage."
         )
 
     st.divider()
@@ -578,7 +658,8 @@ if page == "Dashboard":
         for offset in range(5, -1, -1):
             index = (
                 anchor.year * 12
-                + anchor.month - 1
+                + anchor.month
+                - 1
                 - offset
             )
 
@@ -630,11 +711,12 @@ if page == "Dashboard":
         category_values = summary["categories"]
 
         if category_values:
+
             fig = px.pie(
                 names=list(category_values),
                 values=[
-                    float(v)
-                    for v in category_values.values()
+                    float(value)
+                    for value in category_values.values()
                 ],
                 hole=0.62,
                 title=f"{selected} Expenses",
@@ -656,7 +738,7 @@ if page == "Dashboard":
 
         else:
             st.info(
-                "No dated expenses for this reporting month."
+                "No dated expenses for this month."
             )
 
     st.subheader("Recent Transactions")
@@ -679,26 +761,25 @@ if page == "Dashboard":
 
     if undated:
         st.warning(
-            f"{undated} legacy transaction(s) have no "
-            "valid date and are excluded from monthly "
-            "analytics. They remain visible under "
-            "Manage Transactions."
+            f"{undated} transaction(s) have no valid date "
+            "and are excluded from monthly analytics."
         )
 
     st.caption(
-        "Historical income is based on your current "
-        "income setting. Monthly income history is "
-        "not stored in v0.9."
+        "Historical income uses the current income "
+        "setting; separate monthly income history "
+        "is not stored."
     )
 
 
-# ----------------------------------------
+# ==========================================
 # MONTHLY ANALYTICS
-# ----------------------------------------
+# ==========================================
 
 elif page == "Monthly Analytics":
 
     st.title("Monthly Analytics")
+
     st.caption(
         "Explore expenses across reporting months."
     )
@@ -706,9 +787,12 @@ elif page == "Monthly Analytics":
     selected = st.selectbox(
         "Reporting Month",
         months,
-        format_func=lambda m: datetime.strptime(
-            m, "%Y-%m"
-        ).strftime("%B %Y"),
+        format_func=lambda month: (
+            datetime.strptime(
+                month,
+                "%Y-%m",
+            ).strftime("%B %Y")
+        ),
     )
 
     summary = budget_summary(
@@ -750,10 +834,11 @@ elif page == "Monthly Analytics":
     else:
         by_category = pd.DataFrame([
             {
-                "Category": k,
-                "Amount": float(v),
+                "Category": category,
+                "Amount": float(amount),
             }
-            for k, v in summary["categories"].items()
+            for category, amount
+            in summary["categories"].items()
         ]).sort_values(
             "Amount",
             ascending=False,
@@ -788,17 +873,12 @@ elif page == "Monthly Analytics":
             )
         )
 
-    st.caption(
-        "Older undated transactions are excluded "
-        "from monthly reporting."
-    )
 
+# ==========================================
+# ADD EXPENSE — LOCAL MODE ONLY
+# ==========================================
 
-# ----------------------------------------
-# ADD EXPENSE
-# ----------------------------------------
-
-elif page == "Add Expense":
+elif page == "Add Expense" and not DEMO_MODE:
 
     st.title("Add Expense")
 
@@ -811,6 +891,7 @@ elif page == "Add Expense":
         "add_expense_form",
         clear_on_submit=True,
     ):
+
         category = st.selectbox(
             "Expense Category",
             CATEGORIES,
@@ -849,9 +930,6 @@ elif page == "Add Expense":
                 when,
             )
 
-        except ValueError as exc:
-            st.error(str(exc))
-
         except Exception as exc:
             st.error(
                 f"Unable to save transaction: {exc}"
@@ -864,23 +942,28 @@ elif page == "Add Expense":
             st.rerun()
 
 
-# ----------------------------------------
+# ==========================================
 # MANAGE TRANSACTIONS
-# ----------------------------------------
+# ==========================================
 
 elif page == "Manage Transactions":
 
     st.title("Manage Transactions")
 
-    st.caption(
-        "Filter, review, edit, and delete "
-        "recorded expenses."
-    )
+    if DEMO_MODE:
+        st.caption(
+            "Filter and review fictional expenses. "
+            "Editing and deletion are disabled."
+        )
+    else:
+        st.caption(
+            "Filter, review, edit, and delete "
+            "recorded expenses."
+        )
 
     if frame.empty:
         st.info(
-            "No transactions available. "
-            "Add an expense to get started."
+            "No transactions available."
         )
 
     else:
@@ -959,6 +1042,7 @@ elif page == "Manage Transactions":
         )
 
         if not filtered.empty:
+
             csv = filtered[
                 [
                     "id",
@@ -978,163 +1062,172 @@ elif page == "Manage Transactions":
                 mime="text/csv",
             )
 
-        st.divider()
-
-        options = {
-            (
-                f"#{t['id']} · "
-                f"{t['description']} · "
-                f"{cash(t['amount'])}"
-            ): t
-            for t in transactions
-        }
-
-        label = st.selectbox(
-            "Choose a Transaction to Manage",
-            list(options),
-        )
-
-        selected = options[label]
-
-        edit_tab, delete_tab = st.tabs([
-            "✏️ Edit",
-            "🗑️ Delete",
-        ])
-
-        with edit_tab:
-            st.caption(
-                "Edit category, description, and amount. "
-                "Existing dates are preserved."
+        # Demo mode ends here.
+        # No editing controls are displayed.
+        if DEMO_MODE:
+            st.info(
+                "Read-only demo: transactions cannot "
+                "be added, edited, or deleted."
             )
 
-            with st.form(
-                f"edit_{selected['id']}"
-            ):
-                current_category = str(
-                    selected.get("category") or "Other"
+        else:
+            st.divider()
+
+            options = {
+                (
+                    f"#{transaction['id']} · "
+                    f"{transaction['description']} · "
+                    f"{cash(transaction['amount'])}"
+                ): transaction
+                for transaction in transactions
+            }
+
+            label = st.selectbox(
+                "Choose a Transaction to Manage",
+                list(options),
+            )
+
+            selected = options[label]
+
+            edit_tab, delete_tab = st.tabs([
+                "✏️ Edit",
+                "🗑️ Delete",
+            ])
+
+            with edit_tab:
+
+                st.caption(
+                    "Edit category, description, and amount. "
+                    "Existing dates are preserved."
                 )
 
-                category_options = list(
-                    dict.fromkeys(
-                        CATEGORIES + [current_category]
+                with st.form(
+                    f"edit_{selected['id']}"
+                ):
+
+                    current_category = str(
+                        selected.get("category") or "Other"
                     )
-                )
 
-                new_category = st.selectbox(
-                    "Category",
-                    category_options,
-                    index=category_options.index(
-                        current_category
-                    ),
-                )
+                    category_options = list(
+                        dict.fromkeys(
+                            CATEGORIES + [current_category]
+                        )
+                    )
 
-                new_description = st.text_input(
-                    "Description",
-                    value=str(
-                        selected.get("description") or ""
-                    ),
-                    max_chars=200,
-                )
-
-                new_amount = st.number_input(
-                    "Amount ($)",
-                    min_value=0.01,
-                    value=max(
-                        float(
-                            selected.get("amount") or 0
+                    new_category = st.selectbox(
+                        "Category",
+                        category_options,
+                        index=category_options.index(
+                            current_category
                         ),
-                        0.01,
-                    ),
-                    step=1.00,
-                    format="%.2f",
+                    )
+
+                    new_description = st.text_input(
+                        "Description",
+                        value=str(
+                            selected.get("description") or ""
+                        ),
+                        max_chars=200,
+                    )
+
+                    new_amount = st.number_input(
+                        "Amount ($)",
+                        min_value=0.01,
+                        value=max(
+                            float(
+                                selected.get("amount") or 0
+                            ),
+                            0.01,
+                        ),
+                        step=1.00,
+                        format="%.2f",
+                    )
+
+                    update_clicked = (
+                        st.form_submit_button(
+                            "Update Transaction",
+                            type="primary",
+                        )
+                    )
+
+                if update_clicked:
+                    try:
+                        if not new_description.strip():
+                            raise ValueError(
+                                "Description is required."
+                            )
+
+                        value = positive_money(
+                            new_amount
+                        )
+
+                        updated = update_transaction(
+                            selected["id"],
+                            new_category,
+                            new_description.strip(),
+                            float(value),
+                        )
+
+                        if updated:
+                            st.success(
+                                "Transaction updated."
+                            )
+                            st.rerun()
+                        else:
+                            st.error(
+                                "Transaction not found."
+                            )
+
+                    except Exception as exc:
+                        st.error(
+                            f"Unable to update: {exc}"
+                        )
+
+            with delete_tab:
+
+                st.warning(
+                    "Deletion is permanent. "
+                    "Verify the selected transaction."
                 )
 
-                update_clicked = (
-                    st.form_submit_button(
-                        "Update Transaction",
-                        type="primary",
-                    )
+                confirm = st.checkbox(
+                    "I want to permanently delete "
+                    f"transaction #{selected['id']}",
+                    key=f"confirm_{selected['id']}",
                 )
 
-            if update_clicked:
-                try:
-                    if not new_description.strip():
-                        raise ValueError(
-                            "Description is required."
+                if st.button(
+                    "Delete Transaction",
+                    disabled=not confirm,
+                    type="primary",
+                ):
+                    try:
+                        deleted = delete_transaction(
+                            selected["id"]
                         )
 
-                    value = positive_money(
-                        new_amount
-                    )
+                        if deleted:
+                            st.success(
+                                "Transaction deleted."
+                            )
+                            st.rerun()
+                        else:
+                            st.error(
+                                "Transaction not found."
+                            )
 
-                    updated = update_transaction(
-                        selected["id"],
-                        new_category,
-                        new_description.strip(),
-                        float(value),
-                    )
-
-                    if updated:
-                        st.success(
-                            "Transaction updated."
-                        )
-                        st.rerun()
-                    else:
+                    except Exception as exc:
                         st.error(
-                            "Transaction not found."
+                            f"Unable to delete: {exc}"
                         )
 
-                except ValueError as exc:
-                    st.error(str(exc))
 
-                except Exception as exc:
-                    st.error(
-                        f"Unable to update: {exc}"
-                    )
+# ==========================================
+# SETTINGS — LOCAL MODE ONLY
+# ==========================================
 
-        with delete_tab:
-            st.warning(
-                "Deletion is permanent. "
-                "Verify the selected transaction."
-            )
-
-            confirm = st.checkbox(
-                "I want to permanently delete "
-                f"transaction #{selected['id']}",
-                key=f"confirm_{selected['id']}",
-            )
-
-            if st.button(
-                "Delete Transaction",
-                disabled=not confirm,
-                type="primary",
-            ):
-                try:
-                    deleted = delete_transaction(
-                        selected["id"]
-                    )
-
-                    if deleted:
-                        st.success(
-                            "Transaction deleted."
-                        )
-                        st.rerun()
-                    else:
-                        st.error(
-                            "Transaction not found."
-                        )
-
-                except Exception as exc:
-                    st.error(
-                        f"Unable to delete: {exc}"
-                    )
-
-
-# ----------------------------------------
-# SETTINGS
-# ----------------------------------------
-
-elif page == "Settings":
+elif page == "Settings" and not DEMO_MODE:
 
     st.title("Budget Settings")
 
@@ -1146,6 +1239,7 @@ elif page == "Settings":
     with st.form(
         "budget_settings_form"
     ):
+
         income_input = st.number_input(
             "Monthly Income ($)",
             min_value=0.0,
@@ -1228,4 +1322,5 @@ elif page == "Settings":
         "Keep a backup of your SQLite database "
         "before replacing or moving application files."
     )
+
 
