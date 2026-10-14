@@ -1,5 +1,21 @@
 # 💚 BudgetWise
 
+## Live Application
+
+**[Launch BudgetWise — Interactive Demo](https://budgetwise-d2mib7q8pdbtjr3djg86jv.streamlit.app/)**
+
+Explore BudgetWise directly in your browser.
+
+The public demonstration includes:
+- Interactive financial overview
+- Monthly income and expense analysis
+- Spending breakdowns by category
+- Savings goal calculations
+- Transaction filtering and CSV export
+- Fictional financial data in read-only mode
+
+**Note:** The public demo uses sample financial information. The local application supports SQLite-based transaction management.
+
 ### Personal Finance Dashboard | Python • Streamlit • SQLite • Plotly
 
 BudgetWise is an interactive personal finance application built with Python. It helps users track monthly expenses, monitor available income, visualize spending habits, and evaluate savings goals through a modern dashboard.
